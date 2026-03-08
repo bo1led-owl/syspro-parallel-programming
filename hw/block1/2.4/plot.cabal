@@ -1,0 +1,15 @@
+cabal-version:      3.0
+name:               plot
+version:            0.1.0.0
+build-type:         Simple
+
+common warnings
+    ghc-options: -Wall -Wextra -threaded -rtsopts -with-rtsopts=-N12
+
+executable plot
+    import:           warnings
+    main-is:          Plot.hs
+    other-modules:    Async
+    build-depends:    base, Chart, Chart-diagrams, text, attoparsec, containers, filepath, directory
+    hs-source-dirs:   .
+    default-language: Haskell2010

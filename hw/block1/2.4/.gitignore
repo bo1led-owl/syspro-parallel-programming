@@ -1,0 +1,11 @@
+dist-newstyle/
+target/
+_minted/
+*.minted
+**/.classpath
+**/.project
+**/.factorypath
+**/.settings/
+*.aux
+*.log
+svg-inkscape/

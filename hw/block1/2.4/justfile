@@ -1,0 +1,12 @@
+run: build
+    PATH="/usr/lib/jvm/java-11-openjdk/bin/:$PATH" java -jar target/benchmarks.jar -rf csv
+
+build:
+    mvn clean verify
+
+plot:
+    cabal -O2 run
+
+pdf:
+    pdflatex --shell-escape solution.tex
+    rm *.cpt
