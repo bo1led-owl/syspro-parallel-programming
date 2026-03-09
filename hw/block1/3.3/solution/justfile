@@ -1,0 +1,2 @@
+run:
+    PATH="/usr/lib/jvm/java-11-openjdk/bin/:$PATH" mvn clean verify
