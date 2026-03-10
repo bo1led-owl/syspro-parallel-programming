@@ -17,6 +17,6 @@ class ThreadPerTaskExecutorService {
      * @return future to check computation status and wait for completion.
      */
     <T> JoinFuture<T> submit(Callable<T> task) {
-        return new JoinFuture<T>(factory, task);
+        return JoinFuture.<T>createAndStart(factory, task);
     }
 }

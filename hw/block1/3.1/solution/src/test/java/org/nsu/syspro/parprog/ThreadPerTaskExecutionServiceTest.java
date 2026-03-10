@@ -10,16 +10,25 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class ThreadPerTaskExecutionServiceTest {
-    class SimpleThreadFactory implements ThreadFactory {
+    class TestThreadFactory implements ThreadFactory {
+        private long threadsCreated = 0;
+
         @Override
         public Thread newThread(Runnable r) {
+            threadsCreated++;
             return new Thread(r);
+        }
+
+        public long threadsCreated() {
+            return threadsCreated;
         }
     }
 
-    private final ThreadFactory threadFactory = new SimpleThreadFactory();
+    private final TestThreadFactory threadFactory = new TestThreadFactory();
 
     private ThreadPerTaskExecutorService newService() {
         return new ThreadPerTaskExecutorService(threadFactory);
@@ -132,5 +141,60 @@ public class ThreadPerTaskExecutionServiceTest {
         }
 
         assertEquals(expected, actual);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = { 1, 10, 100, 1000 })
+    public void countThreads(int tasksToStart) {
+        final Callable<Integer> task = () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException("test thread got interrupted: " + e);
+            }
+
+            return 42;
+        };
+
+        var service = newService();
+
+        long threadsBefore = threadFactory.threadsCreated();
+
+        for (int i = 0; i < tasksToStart; ++i) {
+            service.submit(task);
+        }
+
+        long threadsAfter = threadFactory.threadsCreated();
+
+        assertEquals(tasksToStart, threadsAfter - threadsBefore);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = { 1, 5, 10, 25, 50, 100 })
+    public void recursiveSubmission(final int depth) throws ExecutionException {
+        final var service = newService();
+
+        class Task implements Callable<Integer> {
+            final int depth;
+
+            public Task(int depth) {
+                this.depth = depth;
+            }
+
+            @Override
+            public Integer call() throws ExecutionException {
+                int res = depth;
+                if (depth > 0) {
+                    res += service.submit(new Task(depth - 1)).get();
+                }
+
+                return res;
+            }
+        }
+
+        int expected = (1 + depth) * depth / 2; // arithmetic progression
+
+        var future = service.submit(new Task(depth));
+        assertEquals(expected, future.get());
     }
 }

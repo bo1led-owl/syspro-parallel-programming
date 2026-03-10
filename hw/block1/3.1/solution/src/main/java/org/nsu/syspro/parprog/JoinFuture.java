@@ -9,7 +9,7 @@ public class JoinFuture<V> {
     private V result = null;
     private Exception thrownException = null;
 
-    JoinFuture(ThreadFactory workerFactory, Callable<V> task) {
+    private JoinFuture(ThreadFactory workerFactory, Callable<V> task) {
         this.worker = workerFactory.newThread(() -> {
             try {
                 result = task.call();
@@ -17,7 +17,12 @@ public class JoinFuture<V> {
                 thrownException = e;
             }
         });
-        this.worker.start();
+    }
+
+    public static <V> JoinFuture<V> createAndStart(ThreadFactory threadFactory, Callable<V> task) {
+        var res = new JoinFuture<V>(threadFactory, task);
+        res.worker.start();
+        return res;
     }
 
     /**
@@ -28,12 +33,14 @@ public class JoinFuture<V> {
      * @throws ExecutionException if the computation threw an exception.
      */
     public V get() throws ExecutionException {
-        while (worker.isAlive()) {
+        // falls through after `join` if not interrupted, retried otherwise
+        do {
             try {
                 worker.join();
             } catch (InterruptedException e) {
+                continue; // continue waiting
             }
-        }
+        } while (false);
 
         if (thrownException != null) {
             throw new ExecutionException(thrownException);
