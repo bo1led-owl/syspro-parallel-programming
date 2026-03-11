@@ -4,8 +4,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class SplitCounter implements Counter {
-    private Lock[] locks;
-    private long[] value;
+    private final Lock[] locks;
+    private final long[] value;
 
     private int granularity() {
         return locks.length;

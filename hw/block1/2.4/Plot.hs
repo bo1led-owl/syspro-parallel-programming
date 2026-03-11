@@ -145,14 +145,7 @@ plotter benchmarkName results = do
 tickedAxis :: (Show a, Integral a) => [a] -> AxisData a
 tickedAxis points = AxisData def vport invport ((,5) <$> points) [(\x -> (x, show x)) <$> points] points
   where
-    vport r i =
-      linMap
-        id
-        ( fromIntegral imin - 0.5,
-          fromIntegral imax + 0.5
-        )
-        r
-        (fromIntegral i)
+    vport r i = linMap id (fromIntegral imin - 0.5, fromIntegral imax + 0.5) r (fromIntegral i)
     invport = invLinMap round fromIntegral (imin, imax)
     imin = minimum points
     imax = maximum points

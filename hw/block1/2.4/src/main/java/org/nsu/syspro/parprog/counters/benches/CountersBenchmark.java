@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
-@Measurement(iterations = 7, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 @State(Scope.Benchmark)
 public class CountersBenchmark {
@@ -27,7 +27,7 @@ public class CountersBenchmark {
         Split_1,
         Split_2,
         Split_4,
-        Split_10,
+        Split_8,
         Split_20,
         Split_10000;
 
@@ -45,8 +45,8 @@ public class CountersBenchmark {
                     return new SplitCounter(2);
                 case Split_4:
                     return new SplitCounter(4);
-                case Split_10:
-                    return new SplitCounter(10);
+                case Split_8:
+                    return new SplitCounter(8);
                 case Split_20:
                     return new SplitCounter(20);
                 case Split_10000:
@@ -60,13 +60,13 @@ public class CountersBenchmark {
     @Param({
             "Unsafe",
             "Unfair",
-            // "Fair",
-            // "Split_1",
-            // "Split_2",
-            // "Split_4",
-            // "Split_10",
-            // "Split_20",
-            // "Split_10000",
+            "Fair",
+            "Split_1",
+            "Split_2",
+            "Split_4",
+            "Split_8",
+            "Split_20",
+            "Split_10000",
     })
     String counterType;
     Counter counterInstance;
