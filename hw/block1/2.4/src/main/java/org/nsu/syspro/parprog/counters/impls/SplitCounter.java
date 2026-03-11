@@ -53,12 +53,16 @@ public class SplitCounter implements Counter {
         int offset = myPortion();
         for (int i = 0; i < granularity(); ++i) {
             int idx = (offset + i) % granularity();
-
             locks[idx].lock();
-            try {
-                res += value[idx];
-            } finally {
-                locks[idx].unlock();
+        }
+
+        try {
+            for (var portion : value) {
+                res += portion;
+            }
+        } finally {
+            for (var l : locks) {
+                l.unlock();
             }
         }
         return res;

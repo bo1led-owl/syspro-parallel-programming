@@ -42,6 +42,24 @@ public class NoContentionBaseline {
     }
 
     @Benchmark
+    @Threads(8)
+    public void thread_private_plain_inc8(ThreadState s) {
+        s.threadPrivateCounter++;
+    }
+
+    @Benchmark
+    @Threads(12)
+    public void thread_private_plain_inc12(ThreadState s) {
+        s.threadPrivateCounter++;
+    }
+
+    @Benchmark
+    @Threads(16)
+    public void thread_private_plain_inc16(ThreadState s) {
+        s.threadPrivateCounter++;
+    }
+
+    @Benchmark
     @Threads(Threads.MAX)
     public void thread_private_plain_incmax(ThreadState s) {
         s.threadPrivateCounter++;
@@ -68,6 +86,24 @@ public class NoContentionBaseline {
     @Benchmark
     @Threads(4)
     public long thread_private_plain_get4(ThreadState s) {
+        return s.threadPrivateCounter;
+    }
+
+    @Benchmark
+    @Threads(8)
+    public long thread_private_plain_get8(ThreadState s) {
+        return s.threadPrivateCounter;
+    }
+
+    @Benchmark
+    @Threads(12)
+    public long thread_private_plain_get12(ThreadState s) {
+        return s.threadPrivateCounter;
+    }
+
+    @Benchmark
+    @Threads(16)
+    public long thread_private_plain_get16(ThreadState s) {
         return s.threadPrivateCounter;
     }
 

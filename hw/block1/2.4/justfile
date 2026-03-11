@@ -1,6 +1,9 @@
 run: build
     PATH="/usr/lib/jvm/java-11-openjdk/bin/:$PATH" java -jar target/benchmarks.jar -rf csv
 
+perf: build
+    doas /usr/lib/jvm/java-11-openjdk/bin/java -Djmh.ignoreLock=true -jar target/benchmarks.jar "org.nsu.syspro.parprog.counters.benches.CountersBenchmark.inc2" "org.nsu.syspro.parprog.counters.benches.CountersBenchmark.inc4" -rf csv -prof perfc2c -f 1
+
 build:
     mvn clean verify
 

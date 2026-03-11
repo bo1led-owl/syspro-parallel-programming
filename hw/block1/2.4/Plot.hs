@@ -1,5 +1,7 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-missing-fields #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
@@ -9,6 +11,7 @@ import Data.Attoparsec.Text
 import Data.Bifunctor
 import Data.Char
 import Data.Foldable
+import Data.Function
 import Data.Functor hiding (unzip)
 import Data.List qualified as L
 import Data.Map qualified as M
@@ -74,18 +77,19 @@ main = do
   either (putStrLn . ("error occured: " ++)) makePlots (parseOnly parseBenchmarkData input)
 
 makePlots :: M.Map String [BenchmarkResult] -> IO ()
-makePlots benchmarkData = do
+makePlots unsortedData = do
+  let benchmarkData = L.sortBy (compare `on` threadCount) <$> unsortedData
   createDirectoryIfMissing False plotsDir
   let results = (\name -> (name, benchmarkData M.! name)) <$> M.keys benchmarkData
   runAsync_ $ do
-    for_
-      results
-      (\(benchName, results) -> runTask_ $ plotter benchName (tupleToList $ toCorrelations results))
+    for_ results (async_ . uncurry makePlot)
     let splits = filter (("Split" `L.isSubsequenceOf`) . fst) results
-    runTask_ $
-      plotter "SplitCounter_get" (mergeSplits $ second (filter ((== Get) . operation)) <$> splits)
-    runTask_ $
-      plotter "SplitCounter_increment" (mergeSplits $ second (filter ((== Inc) . operation)) <$> splits)
+    async_ $ plotter "SplitCounter_get" (mergeSplits $ filterSplits Get <$> splits)
+    async_ $ plotter "SplitCounter_increment" (mergeSplits $ filterSplits Inc <$> splits)
+  where
+    makePlot benchName results =
+      plotter benchName ((tupleToList . toCorrelations) results)
+    filterSplits op = second (filter ((== op) . operation))
 
 mergeSplits :: [(String, [BenchmarkResult])] -> [Correlation]
 mergeSplits = fmap (uncurry correlations)
@@ -110,21 +114,45 @@ data Correlation = Correlation String [(Int, Double, Double)] deriving (Show)
 plotter :: String -> [Correlation] -> IO ()
 plotter benchmarkName results = do
   putStrLn ("plotting " ++ benchmarkName)
-  toFile def (plotsDir </> benchmarkName <.> "svg") ec
+  renderableToFile def (plotsDir </> benchmarkName <.> "svg") chart
   putStrLn ("finished " ++ benchmarkName)
   where
-    ec :: EC (Layout Int Double) ()
-    ec = do
-      setColors [opaque green, opaque red, opaque magenta, opaque orange, opaque coral, opaque darkviolet]
-      layout_title .= benchmarkName
-      layout_x_axis . laxis_title .= "threads"
-      layout_y_axis . laxis_title .= "ops/ms"
-      plot $ errbars "Score error (99.9%)" (results >>= (\(Correlation _ vals) -> vals))
-      for_ results (\(Correlation name points) -> plot $ line name [(\(t, s, _) -> (t, s)) <$> points])
+    chart = toRenderable layout
+    layout =
+      layout_title .~ benchmarkName $
+        layout_x_axis . laxis_generate .~ tickedAxis $
+          layout_x_axis . laxis_title .~ "threads" $
+            layout_y_axis . laxis_title .~ "ops/ms" $
+              layout_plots .~ (toPlot errbars : fmap toPlot benchmarkPlots) $
+                def
+    errbars =
+      let vals = (results >>= (\(Correlation _ vals) -> vals))
+       in plot_errbars_values .~ [symErrPoint x y 0 dy | (x, y, dy) <- vals] $
+            plot_errbars_title .~ "Score error (99.9%)" $
+              plot_errbars_line_style . line_color .~ opaque blue $
+                def
+    benchmarkPlots =
+      zipWith
+        makePoints
+        ([opaque green, opaque red, opaque magenta, opaque orange, opaque coral, opaque darkviolet] :: [AlphaColour Double])
+        results
+    makePoints color (Correlation name points) =
+      plot_lines_title .~ name $
+        plot_lines_style . line_color .~ color $
+          plot_lines_values .~ [(\(t, s, _) -> (t, s)) <$> points] $
+            def
 
-errbars :: (Num x, Num y) => String -> [(x, y, y)] -> EC l (PlotErrBars x y)
-errbars title vals = liftEC $ do
-  let c = opaque blue
-  plot_errbars_values .= [symErrPoint x y 0 dy | (x, y, dy) <- vals]
-  plot_errbars_title .= title
-  plot_errbars_line_style . line_color .= c
+tickedAxis :: (Show a, Integral a) => [a] -> AxisData a
+tickedAxis points = AxisData def vport invport ((,5) <$> points) [(\x -> (x, show x)) <$> points] points
+  where
+    vport r i =
+      linMap
+        id
+        ( fromIntegral imin - 0.5,
+          fromIntegral imax + 0.5
+        )
+        r
+        (fromIntegral i)
+    invport = invLinMap round fromIntegral (imin, imax)
+    imin = minimum points
+    imax = maximum points

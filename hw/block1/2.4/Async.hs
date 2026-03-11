@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module Async
@@ -6,13 +7,14 @@ module Async
     Future,
     runAsync,
     runAsync_,
-    runTask,
-    runTask_,
+    async,
+    async_,
     await,
   )
 where
 
 import Control.Concurrent
+import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 
@@ -32,54 +34,52 @@ instance Monad Async where
     c2 t
 
 instance MonadIO Async where
-  liftIO = Async . const . liftIO
+  liftIO = Async . const
 
 data Tasks where
   Nil :: Tasks
   Cons :: Future a -> Tasks -> Tasks
 
-newtype ThreadPool = ThreadPool (MVar Tasks)
+newtype Future a = Future (MVar a)
 
-newtype Future a = Future (MVar (Maybe a))
-
-awaitIO :: Future a -> IO (Maybe a)
+awaitIO :: Future a -> IO a
 awaitIO (Future mvar) = readMVar mvar
 
-await :: Future a -> Async (Maybe a)
-await = liftIO . awaitIO
+await :: Future a -> Async a
+await future = liftIO $ awaitIO future
+
+newtype ThreadPool = ThreadPool (MVar Tasks)
 
 threadPool :: IO ThreadPool
 threadPool = ThreadPool <$> newMVar Nil
 
-stopThreadPool :: MVar Tasks -> IO ()
-stopThreadPool threads = do
+stopThreadPool :: ThreadPool -> IO ()
+stopThreadPool tp@(ThreadPool threads) = do
   tasks <- liftIO $ takeMVar threads
   case tasks of
     Nil -> pure ()
     Cons t ts -> do
       liftIO $ putMVar threads ts
       awaitIO t
-      stopThreadPool threads
+      stopThreadPool tp
 
-runTask :: IO a -> Async (Future a)
-runTask task =
+async :: IO a -> Async (Future a)
+async task =
   Async $ \(ThreadPool tasks) -> liftIO $ do
     future@(Future mvar) <- Future <$> newEmptyMVar
-    liftIO $ modifyMVar_ tasks (\ts -> pure (future `Cons` ts))
-    forkFinally
-      (task >>= (putMVar mvar . Just))
-      (\_ -> putMVar mvar Nothing)
+    modifyMVar_ tasks (pure . (future `Cons`))
+    forkIO (task >>= putMVar mvar)
     pure future
 
-runTask_ :: IO a -> Async (Future ())
-runTask_ = runTask . void
+async_ :: IO a -> Async (Future ())
+async_ = async . void
 
 runAsync :: Async a -> IO a
 runAsync (Async comp) = do
-  tp@(ThreadPool threads) <- threadPool
-  res <- comp tp
-  stopThreadPool threads
-  pure res
+  tp <- threadPool
+  (res :: Either SomeException a) <- try $ comp tp
+  stopThreadPool tp
+  either throw pure res
 
 runAsync_ :: Async a -> IO ()
 runAsync_ = void . runAsync

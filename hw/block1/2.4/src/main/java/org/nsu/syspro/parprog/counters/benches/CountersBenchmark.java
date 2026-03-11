@@ -60,13 +60,13 @@ public class CountersBenchmark {
     @Param({
             "Unsafe",
             "Unfair",
-            "Fair",
-            "Split_1",
-            "Split_2",
-            "Split_4",
-            "Split_10",
-            "Split_20",
-            "Split_10000",
+            // "Fair",
+            // "Split_1",
+            // "Split_2",
+            // "Split_4",
+            // "Split_10",
+            // "Split_20",
+            // "Split_10000",
     })
     String counterType;
     Counter counterInstance;
@@ -91,6 +91,24 @@ public class CountersBenchmark {
     @Benchmark
     @Threads(4)
     public void inc4() {
+        counterInstance.increment();
+    }
+
+    @Benchmark
+    @Threads(8)
+    public void inc8() {
+        counterInstance.increment();
+    }
+
+    @Benchmark
+    @Threads(12)
+    public void inc12() {
+        counterInstance.increment();
+    }
+
+    @Benchmark
+    @Threads(16)
+    public void inc16() {
         counterInstance.increment();
     }
 
@@ -121,6 +139,24 @@ public class CountersBenchmark {
     @Benchmark
     @Threads(4)
     public long get4() {
+        return counterInstance.get();
+    }
+
+    @Benchmark
+    @Threads(8)
+    public long get8() {
+        return counterInstance.get();
+    }
+
+    @Benchmark
+    @Threads(12)
+    public long get12() {
+        return counterInstance.get();
+    }
+
+    @Benchmark
+    @Threads(16)
+    public long get16() {
         return counterInstance.get();
     }
 

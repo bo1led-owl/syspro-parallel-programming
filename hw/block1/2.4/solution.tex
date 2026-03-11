@@ -97,11 +97,11 @@ Aritifical contention problems can be forced by calling \verb|get| from the thre
 
 \subsection*{BulkSplitCounter}
 
-No \verb|increment|s are lost, because update of any portion is done after acquiring the corresponding lock and before releasing it. Two calls to \verb|idx| do not break anything, simply because a routine cannot jump between \textbf{application} threads, and context switches between hardware threads do not affect the ID of an application thread.
+No \verb|increment|s are lost, because update of any portion is done after acquiring the corresponding lock and before releasing it. Two calls to \verb|idx| do not break anything, simply because a routine cannot jump between Java threads, and context switches do not affect the ID of a Java thread.
 
 Neither \verb|increment| nor \verb|get| can deadlock. There are no blocking methods inside the critical section of \verb|increment| and it eventually releases the lock. All \verb|get|s start lock acquisition from the same (first) lock. This guarantees that only one \verb|get| can happen at a time. Because we already showed that \verb|increment| eventually releases its lock, \verb|get|, if it already progressed and tries to acquire a lock after the first one, will wait only for \verb|increment|s.
 
-All \verb|get|s can observe only non-negative values that are less than or equal to the sum of all arguments passed to \verb|increment|s.
+All \verb|get|s should observe values that are the sum of arguments to all previously happened \verb|increments|. But actually they can observe only non-negative values that are less than or equal to that sum.
 
 To explain given examples lets number the operations in \verb|increment| and \verb|get|:
 \begin{minted}{java}
@@ -132,14 +132,16 @@ Notation \verb|K.i| means that the operation with number $K$ is running on the $
 \item \verb|x.get() == 0| is possible. Let's take two threads, one of them is doing \verb|get()|, the other is doing \verb|increment(5)|. Execution trace \[ 5.1 \to \dots \to 5.N \to 6.1 \to \dots \to 6.N \to 7.1 \to \dots \to 7.N \to 1.1 \to \dots \] gives the desired output.
 \item \verb|x.get() == 5| is possible. Let's take the same two threads as before. Execution trace
 \[ 1.1 \to 2.1 \to 3.1 \to 4.1 \to \dots \to 1.N \to 2.N \to 3.N \to 4.N \to 5.1 \to \dots \] gives the desired output.
-\item \verb|x.get() == -1| is impossible. Getting negative numbers requires a data race, which is impossible because of mutual exclusion, and all counter modification in the code sample only increment it. Overflow is impossible because we assumed a single call to \verb|increment(5)|.
+\item \verb|x.get() == -1| is impossible. Lets assume that we actually got $-1$. It is either due to a negative increment or overflow. Any negative increments is illegal and will cause an exception. Overflow is impossible because our initial value is zero, the only increment is \verb|increment(5)|, and \verb|long| definitely does not overflow on $5$.
 \item \verb|x.get() == 3| is possible. Let's take the same two threads once again. Execution trace
 \begin{multline*}
 1.1 \to 2.1 \to 3.1 \to 4.1 \to 1.2 \to \dots \to 4.3 \to \\
 \to 5.1 \to \dots 5.N \to 6.1 \to \dots \to 6.N \to 7.1 \to \dots \to 7.N \to \\
 \to 1.4 \to \dots
-\end{multline*} gives the desired output.
+\end{multline*} gives the desired output. This output is not what we expected from the counter. If \verb|get| gave us $x$, then we do \verb|increment(5)|, we expect to get $x + 5$, but might get anything from $x + 1$ to $x + 5$ (assuming that \verb|get| happens after \verb|increment|).
 \end{itemize}
+
+The last example shows that \verb|increment| is not atomic, it can be split into small atomic parts, which may lead to incosistencies and unexpected behaivour.
 
 \subsection*{NegativeSplitCounter}
 
