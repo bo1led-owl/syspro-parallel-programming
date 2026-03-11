@@ -6,25 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ThreadFactory;
 
 import org.junit.jupiter.api.Test;
 
 public class SingleThreadExecutionServiceTest {
-    private class TestThreadFactory implements ThreadFactory {
-        private long threadsCreated = 0;
-
-        public long threadsCreated() {
-            return threadsCreated;
-        }
-
-        @Override
-        public Thread newThread(Runnable r) {
-            threadsCreated += 1;
-            return new Thread(r);
-        }
-    }
-
     private final TestThreadFactory threadFactory = new TestThreadFactory();
 
     private SingleTheadExecutorService newService() {
@@ -87,17 +72,34 @@ public class SingleThreadExecutionServiceTest {
             }
         }
 
+        final int TICKS = 1000;
+
         var service = newService();
 
         final var counter = new Counter();
 
         var futures = new ArrayList<CondVarFuture<Integer>>();
-        for (int i = 0; i < 50; ++i) {
+        for (int i = 0; i < TICKS; ++i) {
             futures.add(service.submit(() -> counter.tick()));
         }
 
         for (int i = 0; i < futures.size(); ++i) {
             assertEquals(i, futures.get(i).get());
+        }
+    }
+
+    @Test
+    public void singleThreadness() throws ExecutionException {
+        var service = newService();
+
+        long lastId = 0;
+        for (int i = 0; i < 1000; ++i) {
+            long curId = service.submit(() -> ThreadId.get()).get();
+            if (lastId == 0) {
+                lastId = curId;
+            } else {
+                assertEquals(lastId, curId);
+            }
         }
     }
 
@@ -117,14 +119,16 @@ public class SingleThreadExecutionServiceTest {
     public void threadRestartsOnFatalErrors() throws ExecutionException {
         var service = newService();
 
-        long threads = threadFactory.threadsCreated();
+        var firstId = service.submit(ThreadId::get).get();
 
-        var future = service.submit(() -> ((Object) null).hashCode());
-
+        var future = service.submit(() -> {
+            assert false; // throws `AssertionError`
+            return 42;
+        });
         assertThrows(ExecutionException.class, () -> future.get()); // ensure that the task was run
 
-        assertNotEquals(threads, threadFactory.threadsCreated());
+        var newId = service.submit(ThreadId::get).get();
 
-        assertEquals(42, service.submit(() -> 42).get());
+        assertNotEquals(firstId, newId);
     }
 }

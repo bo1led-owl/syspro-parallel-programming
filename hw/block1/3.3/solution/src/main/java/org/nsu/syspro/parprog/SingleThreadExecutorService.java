@@ -17,7 +17,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 class SingleTheadExecutorService {
     private final ThreadFactory threadFactory;
     private final LinkedBlockingQueue<Task<?>> taskQueue;
-    private final SupervisedWorker worker;
+    private final SupervisedWorker supervisedWorker;
 
     public SingleTheadExecutorService(ThreadFactory f) {
         taskQueue = new LinkedBlockingQueue<>();
@@ -30,13 +30,13 @@ class SingleTheadExecutorService {
                     break;
                 }
 
-                boolean shouldDie = task.run().isFatal();
+                boolean shouldDie = !task.run();
                 if (shouldDie) {
                     break;
                 }
             }
         };
-        worker = new SupervisedWorker(threadFactory, workerJob);
+        supervisedWorker = new SupervisedWorker(threadFactory, workerJob);
     }
 
     /**
@@ -49,7 +49,7 @@ class SingleTheadExecutorService {
      * @return future to the result of the computation.
      */
     <T> CondVarFuture<T> submit(Callable<T> computation) {
-        worker.startIfNotRunning();
+        supervisedWorker.startIfNotRunning();
 
         Task<T> task = new Task<T>(computation);
         try {

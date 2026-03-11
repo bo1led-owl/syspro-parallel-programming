@@ -3,18 +3,6 @@ package org.nsu.syspro.parprog;
 import java.util.concurrent.Callable;
 
 class Task<V> {
-    public enum Result {
-        Ok, Fatal;
-
-        public boolean isOk() {
-            return this == Ok;
-        }
-
-        public boolean isFatal() {
-            return this == Fatal;
-        }
-    }
-
     private final Callable<V> callable;
     private final CondVarFuture<V> future;
 
@@ -26,20 +14,20 @@ class Task<V> {
     /**
      * Run the task and fill its future.
      * 
-     * @return `Result` with `Ok` if the computation terminated normally or threw an
-     *         exception, and `Fatal` if the computation threw an unchecked
+     * @return `true` if the computation terminated normally or threw an
+     *         exception, and `false` if the computation threw an unchecked
      *         `Throwable`.
      */
-    public Result run() {
+    public boolean run() {
         try {
             future.setResult(callable.call());
-            return Result.Ok;
+            return true;
         } catch (Exception e) {
             future.setError(e);
-            return Result.Ok;
+            return true;
         } catch (Throwable e) {
             future.setError(e);
-            return Result.Fatal;
+            return false;
         }
     }
 

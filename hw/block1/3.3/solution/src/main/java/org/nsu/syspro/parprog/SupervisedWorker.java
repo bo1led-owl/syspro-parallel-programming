@@ -20,13 +20,13 @@ class SupervisedWorker {
         this.lock = new ReentrantLock();
         this.threadFactory = threadFactory;
         this.job = job;
-        this.worker = null;
         this.supervisor = createSupervisor();
         this.started = false;
+        this.worker = null;
     }
 
     /**
-     * Start the supervisor + worker system if it is not running already.
+     * Start the "supervisor + worker" system if it is not running already.
      */
     public void startIfNotRunning() {
         lock.lock();
@@ -55,11 +55,13 @@ class SupervisedWorker {
                     lock.unlock();
                 }
 
-                try {
-                    snapshot.join();
-                } catch (InterruptedException e) {
-                    // this thread is a supervisor, so the best it can do is to die
-                    break;
+                if (snapshot != null) {
+                    try {
+                        snapshot.join();
+                    } catch (InterruptedException e) {
+                        // this thread is a supervisor, so the best it can do is to die
+                        break;
+                    }
                 }
 
                 restartWorker();
@@ -70,18 +72,13 @@ class SupervisedWorker {
     }
 
     /**
-     * Restart (create + start) worker, assuming it does not exist at the moment.
-     * 
-     * @throws IllegalStateException if the worker is already created.
+     * Restart (create + start) worker, assuming it terminated or does not exist at
+     * the moment.
      */
     private void restartWorker() {
         lock.lock();
 
         try {
-            if (worker != null) {
-                throw new IllegalStateException("tried to restart an already created worker");
-            }
-
             worker = threadFactory.newThread(job);
             worker.start();
         } finally {
