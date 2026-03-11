@@ -32,7 +32,7 @@ public class SingleThreadExecutionServiceTest {
     }
 
     @Test
-    public void fibonacci() throws ExecutionException {
+    public void simpleChainedTasks() throws ExecutionException {
         var service = newService();
 
         int oneBeforeLast = 0;
@@ -102,7 +102,7 @@ public class SingleThreadExecutionServiceTest {
     }
 
     @Test
-    public void exceptionThrown() throws ExecutionException {
+    public void checkedExceptionThrown() throws ExecutionException {
         var service = newService();
 
         var future = service.submit(() -> {
@@ -124,5 +124,7 @@ public class SingleThreadExecutionServiceTest {
         assertThrows(ExecutionException.class, () -> future.get()); // ensure that the task was run
 
         assertNotEquals(threads, threadFactory.threadsCreated());
+
+        assertEquals(42, service.submit(() -> 42).get());
     }
 }

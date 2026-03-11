@@ -77,7 +77,7 @@ public class CondVarFuture<V> {
                 try {
                     cond.await();
                 } catch (InterruptedException e) {
-                    return null;
+                    throw new RuntimeException(e);
                 }
             }
         } finally {
