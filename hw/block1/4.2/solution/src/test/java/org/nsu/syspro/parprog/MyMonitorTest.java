@@ -12,9 +12,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 public class MyMonitorTest {
     private static class TestThreadFactory implements ThreadFactory {
-        public TestThreadFactory() {
-        }
-
         @Override
         public Thread newThread(Runnable r) {
             return new Thread(r);
@@ -22,6 +19,46 @@ public class MyMonitorTest {
     }
 
     private final TestThreadFactory threadFactory = new TestThreadFactory();
+
+    @Test
+    @Timeout(5)
+    public void spuriousWakeup() throws InterruptedException {
+        final var monitor1 = new MyMonitorOld();
+        final var monitor2 = new MyMonitorOld();
+
+        // final var monitor1 = new MyMonitor();
+        // final var monitor2 = new MyMonitor();
+
+        var t1 = threadFactory.newThread(() -> {
+            monitor1.monitorEnter();
+            {
+                try {
+                    monitor1.monitorWait();
+                } catch (RuntimeException e) {
+                    monitor1.monitorEnter();
+                }
+            }
+            monitor1.monitorExit();
+
+            monitor2.monitorEnter();
+            monitor2.monitorWait();
+            monitor2.monitorExit();
+        });
+
+        t1.start();
+
+        Thread.sleep(1000);
+        t1.interrupt();
+        Thread.sleep(1000);
+
+        monitor1.monitorEnter();
+        monitor1.monitorNotify();
+        monitor1.monitorExit();
+
+        t1.join();
+
+        // this sequence endes only if a spurious wakeup occured
+    }
 
     @ParameterizedTest
     @ValueSource(ints = { 2, 4 })
@@ -57,7 +94,7 @@ public class MyMonitorTest {
 
     @ParameterizedTest
     @ValueSource(ints = { 2, 4, 16, 40 })
-    @Timeout(2000)
+    @Timeout(5)
     public void deadlockFreedom(int threadCount) throws InterruptedException {
         final MyMonitor monitor = new MyMonitor();
 
@@ -85,7 +122,7 @@ public class MyMonitorTest {
     }
 
     @Test
-    @Timeout(1000)
+    @Timeout(2)
     public void simpleWaiting() throws InterruptedException {
         class Flag {
             private int value = -1;
@@ -135,7 +172,7 @@ public class MyMonitorTest {
 
     @ParameterizedTest
     @ValueSource(ints = { 2, 4, 16, 40 })
-    @Timeout(2000)
+    @Timeout(2)
     public void broadcast(int waitersCount) throws InterruptedException {
         final MyMonitor monitor = new MyMonitor();
 

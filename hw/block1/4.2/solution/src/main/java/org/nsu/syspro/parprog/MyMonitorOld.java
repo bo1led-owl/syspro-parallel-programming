@@ -6,22 +6,22 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class MyMonitor {
-    private static class Gate {
+public class MyMonitorOld {
+    private static class WaitFlag {
         private boolean isWaiting;
         private final Lock lock;
         private final Condition cond;
 
-        public Gate() {
+        public WaitFlag() {
             isWaiting = false;
             lock = new ReentrantLock();
             cond = lock.newCondition();
         }
 
         /**
-         * Put current thread to sleep until someone notifies it.
+         * Put current thread to sleep until someone notifies this flag.
          */
-        public void await() throws InterruptedException {
+        public void sleep() throws InterruptedException {
             lock.lock();
             try {
                 isWaiting = true;
@@ -34,7 +34,7 @@ public class MyMonitor {
             }
         }
 
-        /** Awake the waiting thread. */
+        /** Awake the thread that is waiting on this flag. */
         public void awake() {
             lock.lock();
             try {
@@ -46,14 +46,22 @@ public class MyMonitor {
         }
     };
 
+    /** Per-thread `WaitFlag` so threads can add themselves into `waiters`. */
+    private static final ThreadLocal<WaitFlag> waitFlag = new ThreadLocal<>() {
+        @Override
+        public WaitFlag initialValue() {
+            return new WaitFlag();
+        }
+    };
+
     // `ReentrantLock` instead of `Lock` to assure that
     // `IllegalMonitorStateException` is thrown and to use `holdCount`
     private final ReentrantLock lock;
 
     private final Lock waitersLock;
-    private final Queue<Gate> waiters;
+    private final Queue<WaitFlag> waiters;
 
-    MyMonitor() {
+    MyMonitorOld() {
         lock = new ReentrantLock();
         waitersLock = new ReentrantLock();
         waiters = new LinkedList<>();
@@ -137,11 +145,11 @@ public class MyMonitor {
             throw new IllegalMonitorStateException("`monitorWait` called from a thread not holding the lock");
         }
 
-        var gate = new Gate();
+        var myFlag = waitFlag.get();
 
         waitersLock.lock();
         try {
-            waiters.offer(gate);
+            waiters.offer(myFlag);
         } finally {
             waitersLock.unlock();
         }
@@ -152,7 +160,7 @@ public class MyMonitor {
         }
 
         try {
-            gate.await();
+            myFlag.sleep();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -188,7 +196,7 @@ public class MyMonitor {
             throw new IllegalMonitorStateException("`monitorNotify` called from a thread not holding the lock");
         }
 
-        Gate waiter;
+        WaitFlag waiter;
 
         waitersLock.lock();
         try {
@@ -226,7 +234,7 @@ public class MyMonitor {
         waitersLock.lock();
         try {
             for (;;) {
-                Gate waiter = waiters.poll();
+                WaitFlag waiter = waiters.poll();
                 if (waiter == null) {
                     break;
                 }
